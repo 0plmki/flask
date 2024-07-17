@@ -33,19 +33,19 @@ jobs:
           ECS_SERVICE: flask-service
           IMAGE_TAG: latest
         run: |
-          docker pull 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask:latest || echo "No latest image found"
-          docker tag 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask:latest 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask:stable || echo "No latest image to tag"
-          docker push 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask:stable || echo "No new version tag to push"
-          docker build -t flask:latest .
-          docker tag flask:latest 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask:latest
-          docker push 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask:latest
+          docker pull 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:latest || echo "No latest image found"
+          docker tag 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:latest 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:stable || echo "No latest image to tag"
+          docker push 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:stable || echo "No new version tag to push"
+          docker build -t flask-test:latest .
+          docker tag flask-test:latest 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:latest
+          docker push 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:latest
           cat <<EOT > task-definition-dev.json
           {
             "family": "flask-test",
             "containerDefinitions": [
              {
             "name": "flask",
-            "image": "730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask:latest",
+            "image": "730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:latest",
             "cpu": 0,
             "portMappings": [
                 {
