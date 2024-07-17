@@ -19,8 +19,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: AKIA2UC3E3UHGWKLRBV4
-          aws-secret-access-key: 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
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
       - name: Login to Docker registry
@@ -33,19 +33,19 @@ jobs:
           ECS_SERVICE: flask-service
           IMAGE_TAG: latest
         run: |
-          docker pull 730335599886.dkr.ecr.ap-south-1.amazonaws.com/hrms:latest || echo "No latest image found"
-          docker tag 730335599886.dkr.ecr.ap-south-1.amazonaws.com/hrms:latest 730335599886.dkr.ecr.ap-south-1.amazonaws.com/hrms:stable || echo "No latest image to tag"
-          docker push 730335599886.dkr.ecr.ap-south-1.amazonaws.com/hrms:stable || echo "No new version tag to push"
-          docker build -t hrms:latest .
-          docker tag hrms:latest 730335599886.dkr.ecr.ap-south-1.amazonaws.com/hrms:latest
-          docker push 730335599886.dkr.ecr.ap-south-1.amazonaws.com/hrms:latest
+          docker pull 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask:latest || echo "No latest image found"
+          docker tag 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask:latest 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask:stable || echo "No latest image to tag"
+          docker push 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask:stable || echo "No new version tag to push"
+          docker build -t flask:latest .
+          docker tag flask:latest 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask:latest
+          docker push 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask:latest
           cat <<EOT > task-definition-dev.json
           {
             "family": "flask-test",
             "containerDefinitions": [
              {
             "name": "flask",
-            "image": "730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:latest",
+            "image": "730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask:latest",
             "cpu": 0,
             "portMappings": [
                 {
