@@ -19,8 +19,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: AKIA2UC3E3UHNYG25YXA
-          aws-secret-access-key: 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
+          aws-access-key-id: AKIA2UC3E3UHGWKLRBV4
+          aws-secret-access-key: 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
           aws-region: ap-south-1
 
       - name: Login to Docker registry
