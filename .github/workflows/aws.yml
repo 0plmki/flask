@@ -93,6 +93,10 @@ jobs:
           aws ecs register-task-definition --cli-input-json file://task-definition-dev.json
           
       - name: Update ECS service
+        env:
+          ECS_CLUSTER: flask
+          ECS_SERVICE: flask-service
+          IMAGE_TAG: latest
         run: |
           TASK_DEFINITION_ARN=$(aws ecs describe-task-definition --task-definition flask-test | jq -r '.taskDefinition.taskDefinitionArn')
           aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment --region ap-south-1 --desired-count 1 --task-definition $TASK_DEFINITION_ARN 
