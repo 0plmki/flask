@@ -3,7 +3,7 @@ name: Deploy Django to ECS
 on:
   push:
     branches:
-      - aictec-testing
+      - main
 
 jobs:
   build_dev:
