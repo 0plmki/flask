@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  build_dev:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,33 +21,56 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
+          aws-region: ${{ secrets.AWS_REGION_NAME_DEV }}
 
       - name: Login to Docker registry
         run: |
-          aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 730335599886.dkr.ecr.ap-south-1.amazonaws.com
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION_NAME }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION_NAME }}.amazonaws.com
       
       - name: Build and push Docker image
+        env:
+          IMAGE_TAG: latest
+          STABLE_TAG: stable
+        run: |
+          docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION_NAME }}.amazonaws.com/flask-test:$IMAGE_TAG || echo "No latest image found"
+          docker tag ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION_NAME }}.amazonaws.com/flask-test:$IMAGE_TAG ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION_NAME }}.amazonaws.com/flask-test:$STABLE_TAG || echo "No latest image to tag"
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION_NAME }}.amazonaws.com/flask-test:$STABLE_TAG|| echo "No new version tag to push"
+          docker build -t flask-test:$IMAGE_TAG .
+          docker tag flask-test:$IMAGE_TAG ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION_NAME }}.amazonaws.com/flask-test:$IMAGE_TAG
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION_NAME }}.amazonaws.com/flask-test:$IMAGE_TAG
+
+  build-dev:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION_NAME}}
+
+      
+      - name: Deploy to dev
         env:
           ECS_CLUSTER: flask-test
           ECS_SERVICE: flask-new
           IMAGE_TAG: latest
         run: |
-          docker pull 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:latest || echo "No latest image found"
-          docker tag 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:latest 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:stable || echo "No latest image to tag"
-          docker push 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:stable || echo "No new version tag to push"
-          docker build -t flask-test:latest .
-          docker tag flask-test:latest 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:latest
-          docker push 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:latest
-          echo "${{ secrets.ENV_FILE }}" | base64 --decode > .env
-          ENV_VARS=$(cat .env | jq -Rs 'split("\n") | map(select(length > 0)) | map(split("=") | {name: .[0], value: .[1]})')
           cat <<EOT > task-definition-dev.json
           {
-            "family": "flask-test",
+            "family": "$ECS_CLUSTER",
             "containerDefinitions": [
              {
             "name": "flask",
-            "image": "730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:latest",
+            "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION_NAME }}.amazonaws.com/flask-test:$IMAGE_TAG",
             "cpu": 0,
             "portMappings": [
                 {
@@ -59,7 +82,44 @@ jobs:
                 }
             ],
             "essential": true,
-            "environment": $ENV_VARS,
+            "environment": [
+                {
+                    "name": "RDS_HOST",
+                    "value": "${{ secrets.RDS_HOST }}"
+                },
+                {
+                    "name": "RDS_PASSWORD",
+                    "value": "${{ secrets.RDS_PASSWORD }}"
+                },
+                {
+                    "name": "RDS_USER",
+                    "value": "${{ secrets.RDS_USER }}"
+                },
+                {
+                    "name": "RDS_PORT",
+                    "value": "${{ secrets.RDS_PORT }}"
+                },
+                {
+                    "name": "AWS_ACCESS_KEY_ID",
+                    "value": "${{ secrets.AWS_ACCESS_KEY_ID }}"
+                },
+                {
+                    "name": "AWS_SECRET_ACCESS_KEY",
+                    "value": "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+                },
+                {
+                    "name": "AWS_REGION_NAME",
+                    "value": "${{ secrets.AWS_REGION_NAME }}"
+                },
+                {
+                    "name": "S3_BUCKET_NAME",
+                    "value": "${{ secrets.S3_BUCKET_NAME }}"
+                },
+                {
+                    "name": "RDS_DB",
+                    "value": "${{ secrets.RDS_DB }}"
+                }
+            ],
             "environmentFiles": [],
             "mountPoints": [],
             "volumesFrom": [],
@@ -67,9 +127,9 @@ jobs:
             "logConfiguration": {
                 "logDriver": "awslogs",
                 "options": {
-                    "awslogs-group": "/ecs/flask-test",
+                    "awslogs-group": "/ecs/$ECS_CLUSTER",
                     "awslogs-create-group": "true",
-                    "awslogs-region": "ap-south-1",
+                    "awslogs-region": "${{ secrets.AWS_REGION_NAME }}",
                     "awslogs-stream-prefix": "ecs"
                 },
                 "secretOptions": []
@@ -77,8 +137,8 @@ jobs:
             "systemControls": []
              }
             ],
-           "taskRoleArn": "arn:aws:iam::730335599886:role/ecsTaskExecutionRole",
-           "executionRoleArn": "arn:aws:iam::730335599886:role/ecsTaskExecutionRole",
+           "taskRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ecsTaskExecutionRole",
+           "executionRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ecsTaskExecutionRole",
            "networkMode": "bridge",
            "requiresCompatibilities": [
                        "EC2"
@@ -101,6 +161,134 @@ jobs:
           IMAGE_TAG: latest
         run: |
           TASK_DEFINITION_ARN=$(aws ecs describe-task-definition --task-definition flask-test | jq -r '.taskDefinition.taskDefinitionArn')
-          aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment --region ap-south-1 --desired-count 1 --task-definition $TASK_DEFINITION_ARN 
+          aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment --region ${{ secrets.AWS_REGION_NAME }} --desired-count 1 --task-definition $TASK_DEFINITION_ARN 
 
           rm -rf task-definition-dev.json
+
+  build-test:
+    needs: build-dev
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION_NAME }}
+
+      
+      - name: Deploy to test
+        env:
+          ECS_CLUSTER: flask
+          ECS_SERVICE: flask
+          IMAGE_TAG: latest
+        run: |
+          cat <<EOT > task-definition-test.json
+          {
+            "family": "$ECS_CLUSTER",
+            "containerDefinitions": [
+             {
+            "name": "flask",
+            "image": "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION_NAME }}.amazonaws.com/flask-test:latest",
+            "cpu": 0,
+            "portMappings": [
+                {
+                    "name": "container-port",
+                    "containerPort": 3000,
+                    "hostPort": 0,
+                    "protocol": "tcp",
+                    "appProtocol": "http"
+                }
+            ],
+            "essential": true,
+            "environment": [
+                {
+                    "name": "RDS_HOST",
+                    "value": "${{ secrets.RDS_HOST }}"
+                },
+                {
+                    "name": "RDS_PASSWORD",
+                    "value": "${{ secrets.RDS_PASSWORD }}"
+                },
+                {
+                    "name": "RDS_USER",
+                    "value": "${{ secrets.RDS_USER }}"
+                },
+                {
+                    "name": "RDS_PORT",
+                    "value": "${{ secrets.RDS_PORT }}"
+                },
+                {
+                    "name": "AWS_ACCESS_KEY_ID",
+                    "value": "${{ secrets.AWS_ACCESS_KEY_ID }}"
+                },
+                {
+                    "name": "AWS_SECRET_ACCESS_KEY",
+                    "value": "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+                },
+                {
+                    "name": "AWS_REGION_NAME",
+                    "value": "${{ secrets.AWS_REGION_NAME }}"
+                },
+                {
+                    "name": "S3_BUCKET_NAME",
+                    "value": "${{ secrets.S3_BUCKET_NAME }}"
+                },
+                {
+                    "name": "RDS_DB",
+                    "value": "${{ secrets.RDS_DB }}"
+                }
+            ],
+            "environmentFiles": [],
+            "mountPoints": [],
+            "volumesFrom": [],
+            "ulimits": [],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/$ECS_CLUSTER",
+                    "awslogs-create-group": "true",
+                    "awslogs-region": "${{ secrets.AWS_REGION_NAME }}",
+                    "awslogs-stream-prefix": "ecs"
+                },
+                "secretOptions": []
+            },
+            "systemControls": []
+             }
+            ],
+           "taskRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ecsTaskExecutionRole",
+           "executionRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ecsTaskExecutionRole",
+           "networkMode": "bridge",
+           "requiresCompatibilities": [
+                       "EC2"
+                     ],
+            "cpu": "256",
+            "memory": "256",
+            "runtimePlatform": {
+            "cpuArchitecture": "X86_64",
+            "operatingSystemFamily": "LINUX"
+                }
+           }
+          EOT
+
+          aws ecs register-task-definition --cli-input-json file://task-definition-test.json
+          
+      - name: Update ECS service
+        env:
+          ECS_CLUSTER: flask
+          ECS_SERVICE: flask
+          IMAGE_TAG: latest
+        run: |
+          TASK_DEFINITION_ARN=$(aws ecs describe-task-definition --task-definition flask-test | jq -r '.taskDefinition.taskDefinitionArn')
+          aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment --region ${{ secrets.AWS_REGION_NAME }} --desired-count 1 --task-definition $TASK_DEFINITION_ARN 
+
+          rm -rf task-definition-test.json
+
+  
