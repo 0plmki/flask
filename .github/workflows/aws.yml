@@ -87,8 +87,8 @@ jobs:
             "cpuArchitecture": "X86_64",
             "operatingSystemFamily": "LINUX"
                 }
-            }
-          EOT
+           }
+           EOT
 
           aws ecs register-task-definition --cli-input-json file://task-definition-dev.json
           
