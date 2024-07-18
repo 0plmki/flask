@@ -29,8 +29,8 @@ jobs:
       
       - name: Build and push Docker image
         env:
-          ECS_CLUSTER: flask
-          ECS_SERVICE: flask-service
+          ECS_CLUSTER: flask-test
+          ECS_SERVICE: flask-new
           IMAGE_TAG: latest
         run: |
           docker pull 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:latest || echo "No latest image found"
@@ -39,6 +39,9 @@ jobs:
           docker build -t flask-test:latest .
           docker tag flask-test:latest 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:latest
           docker push 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:latest
+          # Parse the environment variables from the secret
+          echo "${{ secrets.ENV_VARS }}" > env_vars.json
+          ENV_VARS=$(jq -r 'to_entries|map({"name":.key,"value":.value})' env_vars.json)
           cat <<EOT > task-definition-dev.json
           {
             "family": "flask-test",
@@ -57,7 +60,7 @@ jobs:
                 }
             ],
             "essential": true,
-            "environment": [],
+            "environment": $ENV_VARS,
             "environmentFiles": [],
             "mountPoints": [],
             "volumesFrom": [],
@@ -94,8 +97,8 @@ jobs:
           
       - name: Update ECS service
         env:
-          ECS_CLUSTER: flask
-          ECS_SERVICE: flask-service
+          ECS_CLUSTER: flask-test
+          ECS_SERVICE: flask-new
           IMAGE_TAG: latest
         run: |
           TASK_DEFINITION_ARN=$(aws ecs describe-task-definition --task-definition flask-test | jq -r '.taskDefinition.taskDefinitionArn')
