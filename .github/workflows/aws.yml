@@ -39,9 +39,8 @@ jobs:
           docker build -t flask-test:latest .
           docker tag flask-test:latest 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:latest
           docker push 730335599886.dkr.ecr.ap-south-1.amazonaws.com/flask-test:latest
-          # Parse the environment variables from the secret
-          ENV_VARS=$(cat ${{ secrets.ENV_VARS }} | sed 's/^/"/;s/=/": "/;s/$/",/' | tr '\n' ' ')
-          ENV_VARS="{${ENV_VARS::-1}}"
+          echo "${{ secrets.ENV_FILE }}" | base64 --decode > .env
+          ENV_VARS=$(cat .env | jq -Rs 'split("\n") | map(select(length > 0)) | map(split("=") | {name: .[0], value: .[1]})')
           cat <<EOT > task-definition-dev.json
           {
             "family": "flask-test",
