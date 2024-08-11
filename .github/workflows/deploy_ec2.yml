@@ -75,7 +75,7 @@ jobs:
           echo $RDS_PASSWORD
           echo $RDS_USER
           
-          source venv/bin/activate
+          source myenv3.10/bin/activate
 
           # Navigate to the Django project directory
           cd flask
