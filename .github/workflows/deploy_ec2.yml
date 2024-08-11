@@ -52,7 +52,7 @@ jobs:
 
         # Disable host key checking and SSH into the EC2 instance
         ssh -o StrictHostKeyChecking=no -i private_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_IP }} << 'EOF'
-          export RDS_DB=${{ secrets.RDS_DB}
+          export RDS_DB=${{ secrets.RDS_DB}}
           export DB_USER=${{ secrets.DB_USER }}
           export RDS_PASSWORD=${{ secrets.RDS_PASSWORD }}
           export RDS_PORT=${{ secrets.RDS_PORT }}
