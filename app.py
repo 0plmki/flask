@@ -13,7 +13,7 @@ load_dotenv()
 RDS_HOST = os.getenv('RDS_HOST')
 RDS_PORT = os.getenv('RDS_PORT', 5432)
 RDS_DB = os.getenv('RDS_DB')
-RDS_USER = os.getenv('RDS_USER')
+RDS_USER = os.getenv('RDS_USER', 'postgres')
 RDS_PASSWORD = os.getenv('RDS_PASSWORD')
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
 
