@@ -1,0 +1,98 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+    # paths:
+    #   - 'hrms-backend/**'
+  # workflow_dispatch:
+  #   inputs:
+  #     branch:
+  #       description: 'Branch to deploy'
+  #       required: true
+  #       default: 'test_deploy'
+
+jobs:
+  deploy_ec2_1:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.10.12'
+
+    - name: Set up SSH and Deploy
+      env:
+        DB_NAME: ${{ secrets.DB_NAME_DEV}}
+        DB_USER: ${{ secrets.DB_USER }}
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD_DEV }}
+        DB_HOST_: ${{ secrets.DB_HOST_DEV }}
+        DB_PORT: ${{ secrets.DB_PORT }}
+        # AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+        # AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+        # AWS_REGION_NAME: ${{ secrets.AWS_REGION_NAME_DEV }}
+        # AWS_STORAGE_BUCKET_NAME: ${{ secrets.AWS_STORAGE_BUCKET_NAME_DEV }}
+        # SERVER_EMAIL: ${{ secrets.SERVER_EMAIL_DEV }}
+        # SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD_DEV }}
+        # PASSWORD_URL: ${{ secrets.PASSWORD_URL_DEV }}
+        # PASSWORD_URL_APP: ${{ secrets.PASSWORD_URL_APP_DEV }}
+        # CELERY_BROKER_REDIS_URL: ${{ secrets.CELERY_BROKER_REDIS_URL_DEV }}
+        # GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY_DEV }}
+        # LOCK_DURATION: ${{ secrets.LOCK_DURATION_ }}
+        # FAILED_LOGIN_ATTEMPS: ${{ secrets.FAILED_LOGIN_ATTEMPS }}
+
+      run: |
+        # Create the SSH private key file
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > private_key
+        chmod 600 private_key
+
+        # Disable host key checking and SSH into the EC2 instance
+        ssh -o StrictHostKeyChecking=no -i private_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_IP }} << 'EOF'
+          export RDS_DB=${{ secrets.RDS_DB}
+          export DB_USER=${{ secrets.DB_USER }}
+          export RDS_PASSWORD=${{ secrets.RDS_PASSWORD }}
+          export RDS_PORT=${{ secrets.RDS_PORT }}
+          # export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_DEV }}
+          # export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_DEV }}
+          # export AWS_REGION_NAME=${{ secrets.AWS_REGION_NAME_DEV }}
+          # export AWS_STORAGE_BUCKET_NAME=${{ secrets.AWS_STORAGE_BUCKET_NAME_DEV }}
+          # export SERVER_EMAIL=${{ secrets.SERVER_EMAIL_DEV }}
+          # export SERVER_PASSWORD=${{ secrets.SERVER_PASSWORD_DEV }}
+          # export PASSWORD_URL=${{ secrets.PASSWORD_URL_DEV }}
+          # export PASSWORD_URL_APP=${{ secrets.PASSWORD_URL_APP_DEV }}
+          # export CELERY_BROKER_REDIS_URL=${{ secrets.CELERY_BROKER_REDIS_URL_DEV }}
+          # export GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY_DEV }}
+          # export LOCK_DURATION=${{ secrets.LOCK_DURATION_ }}
+          # export FAILED_LOGIN_ATTEMPS=${{ secrets.FAILED_LOGIN_ATTEMPS }}
+          export RDS_HOST=${{ secrets.RDS_HOST }}
+        
+          echo $RDS_HOST
+          echo $RDS_DB
+          echo $RDS_PASSWORD
+          echo $RDS_USER
+          
+          source venv/bin/activate
+
+          # Navigate to the Django project directory
+          cd flask
+
+          # Pull the latest code from the main branch
+          git pull
+          pip install -r requirements.txt
+
+          # Run database migrations and collect static files
+          # python manage.py makemigrations
+          # python manage.py migrate
+          python3 app.py
+
+          # Restart the Gunicorn service
+          # sudo service supervisor restart
+        EOF
+
+    - name: Log deployment message
+      run: |
+           echo "Deployment triggered with message: ${{ github.event.inputs.deployment_message }}"
